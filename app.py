@@ -242,7 +242,10 @@ if st.session_state.dialog_trigger > st.session_state.dialog_consumed:
         if not combos:
             return
 
-        st.caption(f"Affichage des {min(3, len(combos))} meilleures combinaisons")
+        if len(combos) == 1:
+            st.caption("Affichage de la meilleure combinaison")
+        else:
+            st.caption(f"Affichage des {len(combos)} meilleures combinaisons")
 
         for idx, comb in enumerate(combos, start=1):
             st.subheader(f"Combinaison #{idx}")
