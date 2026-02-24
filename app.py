@@ -121,13 +121,6 @@ st.markdown(
     """
 <style>
 /* Cards */
-.card {
-  border: 1px solid rgba(49, 51, 63, 0.2);
-  border-radius: 14px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
 .card-title {
   display:flex;
   justify-content: space-between;
@@ -143,10 +136,6 @@ st.markdown(
 .card-title .price {
   opacity: 0.8;
   font-size: 0.95rem;
-}
-
-div[data-baseweb="input"] input {
-  max-width: 140px !important;
 }
 
 .center-img {
