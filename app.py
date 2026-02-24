@@ -171,8 +171,6 @@ cols = st.columns(len(ITEMS), gap="large")
 
 for col, item in zip(cols, ITEMS):
     with col:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-
         st.markdown(
             f"""
             <div class="card-title">
@@ -185,7 +183,6 @@ for col, item in zip(cols, ITEMS):
 
         st.markdown('<div class="center-img">', unsafe_allow_html=True)
         st.image(item["img"], width=200)
-        st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('Stock')
         st.number_input(
