@@ -43,7 +43,7 @@ ITEMS = [
 # STATE HELPERS
 # -------------------------
 @st.cache_data(show_spinner=False)
-def cached_combos(stocks_tuple, target, keep_one_each: bool):
+def cached_combos_v2(stocks_tuple, target, keep_one_each: bool):
     stocks = dict(stocks_tuple)
     return calculate_sales_combinations(ITEMS, stocks, target, top_k=3, keep_one_each=keep_one_each)
 
@@ -74,44 +74,108 @@ def calculate_sales_combinations(items, stocks, target, top_k=3, keep_one_each=T
     others = sorted(
         [it for it in items if it["key"] != resolver_key],
         key=lambda x: x["price"],
-        reverse=True
+        reverse=True,
     )
 
-    prio_keys = [it["key"] for it in sorted(items, key=lambda x: x.get("priority", 999))]
+    prio_keys = [
+        it["key"] for it in sorted(items, key=lambda x: x.get("priority", 999))
+    ]
 
-    results = []
+    exact_results = []
+    best_above = None
+    best_below = None
 
     def comb_sort_key(comb):
         return tuple(-comb.get(k, 0) for k in prio_keys)
 
-    def push_result(comb):
-        results.append(comb)
-        if len(results) > top_k:
-            results.sort(key=comb_sort_key)
-            del results[top_k:]
+    def total_of(comb):
+        return sum(comb.get(it["key"], 0) * it["price"] for it in items)
+
+    def push_exact(comb):
+        exact_results.append(dict(comb))
+        exact_results.sort(key=comb_sort_key)
+        if len(exact_results) > top_k:
+            del exact_results[top_k:]
+
+    def push_approx(comb):
+        nonlocal best_above, best_below
+
+        total = total_of(comb)
+
+        if total > target:
+            candidate = {
+                "comb": dict(comb),
+                "total": total,
+                "diff": total - target,
+            }
+            if (
+                best_above is None
+                or candidate["diff"] < best_above["diff"]
+                or (
+                    candidate["diff"] == best_above["diff"]
+                    and comb_sort_key(candidate["comb"])
+                    < comb_sort_key(best_above["comb"])
+                )
+            ):
+                best_above = candidate
+
+        elif total < target:
+            candidate = {
+                "comb": dict(comb),
+                "total": total,
+                "diff": target - total,
+            }
+            if (
+                best_below is None
+                or candidate["diff"] < best_below["diff"]
+                or (
+                    candidate["diff"] == best_below["diff"]
+                    and comb_sort_key(candidate["comb"])
+                    < comb_sort_key(best_below["comb"])
+                )
+            ):
+                best_below = candidate
 
     def dfs(i, remaining, current):
         if i == len(others):
-            if remaining % resolver_price != 0:
-                return
-            qty = remaining // resolver_price
-            if qty <= sellable.get(resolver_key, 0):
+            max_resolver_qty = sellable.get(resolver_key, 0)
+
+            if remaining >= 0 and remaining % resolver_price == 0:
+                qty = remaining // resolver_price
+                if qty <= max_resolver_qty:
+                    comb = dict(current)
+                    comb[resolver_key] = qty
+                    push_exact(comb)
+
+            for qty in range(max_resolver_qty + 1):
                 comb = dict(current)
                 comb[resolver_key] = qty
-                push_result(comb)
+                push_approx(comb)
+
             return
 
         it = others[i]
         key, price = it["key"], it["price"]
-        max_qty = min(sellable.get(key, 0), remaining // price)
+        max_qty = sellable.get(key, 0)
 
         for qty in range(max_qty + 1):
             current[key] = qty
             dfs(i + 1, remaining - qty * price, current)
+
         current.pop(key, None)
 
     dfs(0, target, {})
-    return results
+
+    if exact_results:
+        return {"mode": "exact", "results": exact_results}
+
+    approx_results = []
+    if best_above is not None:
+        approx_results.append(best_above["comb"])
+    if best_below is not None:
+        approx_results.append(best_below["comb"])
+
+    return {"mode": "approx", "results": approx_results}
 
 
 # -------------------------
@@ -206,7 +270,7 @@ st.divider()
 # CTA
 # -------------------------
 st.button(
-    f"Trouver des combinaisons (exact ${TARGET:,d})",
+    f"Trouver des combinaisons (objectif ${TARGET:,d})",
     disabled=not can_compute,
     use_container_width=True,
     type="primary",
@@ -219,25 +283,44 @@ st.button(
 if st.session_state.dialog_trigger > st.session_state.dialog_consumed:
     st.session_state.dialog_consumed = st.session_state.dialog_trigger
 
-    @st.dialog(f"Combinaisons possibles (objectif exact ${TARGET:,d})", width="large")
+    @st.dialog(f"Combinaisons possibles (objectif ${TARGET:,d})", width="large")
     def show_combinaisons_dialog():
         stocks_tuple = tuple(sorted(stocks.items()))
 
-        combos = cached_combos(stocks_tuple, TARGET, True)
+        result = cached_combos_v2(stocks_tuple, TARGET, True)
+
+        if isinstance(result, list):
+            result = {"mode": "exact" if result else "approx", "results": result}
+
+        if result["mode"] != "exact":
+            result = cached_combos_v2(stocks_tuple, TARGET, False)
+            if isinstance(result, list):
+                result = {"mode": "exact" if result else "approx", "results": result}
+
+        combos = result["results"]
 
         if not combos:
-            combos = cached_combos(stocks_tuple, TARGET, False)
-
-        if not combos:
+            st.warning("Aucune combinaison trouvée.")
             return
 
-        if len(combos) == 1:
-            st.caption("Affichage de la meilleure combinaison")
+        if result["mode"] == "exact":
+            if len(combos) == 1:
+                st.caption("Affichage de la meilleure combinaison exacte")
+            else:
+                st.caption(f"Affichage des {len(combos)} meilleures combinaisons exactes")
         else:
-            st.caption(f"Affichage des {len(combos)} meilleures combinaisons")
+            st.caption("Impossible de faire exactement 300'000 : affichage de la meilleure combinaison au-dessus et au-dessous")
 
         for idx, comb in enumerate(combos, start=1):
+            total_comb = sum(comb.get(item["key"], 0) * item["price"] for item in ITEMS)
+            ecart = total_comb - TARGET
+
             st.subheader(f"Combinaison #{idx}")
+            if ecart == 0:
+                st.markdown(f"**Total :** \\${total_comb:,d}")
+            else:
+                st.markdown(f"**Total :** \\${total_comb:,d} | **Écart :** {ecart:+,d}")
+
             row = st.columns(len(ITEMS))
 
             for col, item in zip(row, ITEMS):
