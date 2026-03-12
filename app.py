@@ -12,6 +12,7 @@ ITEMS = [
         "key": "basic",
         "label": "Banal",
         "price": 160,
+        "zkea": 2,
         "img": "https://raw.githubusercontent.com/SOZ-Faut-etre-Sub/SOZ-FiveM-Assets/oss/images/items/cabinet_zkea_1.webp",
         "priority": 0,
     },
@@ -19,6 +20,7 @@ ITEMS = [
         "key": "nice",
         "label": "Joli",
         "price": 500,
+        "zkea": 4,
         "img": "https://raw.githubusercontent.com/SOZ-Faut-etre-Sub/SOZ-FiveM-Assets/oss/images/items/cabinet_zkea_2.webp",
         "priority": 1,
     },
@@ -26,6 +28,7 @@ ITEMS = [
         "key": "sublime",
         "label": "Sublime",
         "price": 1600,
+        "zkea": 8,
         "img": "https://raw.githubusercontent.com/SOZ-Faut-etre-Sub/SOZ-FiveM-Assets/oss/images/items/cabinet_zkea_3.webp",
         "priority": 2,
     },
@@ -33,6 +36,7 @@ ITEMS = [
         "key": "divine",
         "label": "Divin",
         "price": 6000,
+        "zkea": 20,
         "img": "https://raw.githubusercontent.com/SOZ-Faut-etre-Sub/SOZ-FiveM-Assets/oss/images/items/cabinet_zkea_4.webp",
         "priority": 3,
     },
@@ -314,12 +318,13 @@ if st.session_state.dialog_trigger > st.session_state.dialog_consumed:
         for idx, comb in enumerate(combos, start=1):
             total_comb = sum(comb.get(item["key"], 0) * item["price"] for item in ITEMS)
             ecart = total_comb - TARGET
+            total_zkea = sum(comb.get(item["key"], 0) * item["zkea"] for item in ITEMS)
 
             st.subheader(f"Combinaison #{idx}")
             if ecart == 0:
-                st.markdown(f"**Total :** \\${total_comb:,d}")
+                st.markdown(f"**Total :** \\${total_comb:,d} | **Zkea :** 🪑{total_zkea}")
             else:
-                st.markdown(f"**Total :** \\${total_comb:,d} | **Écart :** {ecart:+,d}")
+                st.markdown(f"**Total :** \\${total_comb:,d} | **Écart :** {ecart:+,d} | **Zkea :** 🪑{total_zkea}")
 
             row = st.columns(len(ITEMS))
 
